@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Actions are pinned by commit SHA, so Dependabot is what keeps them from
+  # going stale behind the pin.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps"
