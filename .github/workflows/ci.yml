@@ -63,9 +63,11 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
-  # A dependency budget is only a budget if something counts it. This server
-  # reaches the network with the standard library alone; a PR that adds a
-  # module has to justify itself here first.
+  # Every module in the build is named here, direct or transitive. The MCP
+  # SDK brings its own dependencies, so a count would hide a swap; a list
+  # means anything new fails this job and has to be argued for in review.
+  # Network access still goes through internal/policy alone, which the
+  # architecture tests enforce independently of this list.
   deps:
     runs-on: ubuntu-latest
     steps:
@@ -74,14 +76,28 @@ jobs:
         with:
           go-version-file: go.mod
           check-latest: true
-      - name: dependency budget
+      - name: approved modules
         run: |
-          budget=2
-          count=$(go list -deps -f '{{if and .Module (not .Standard)}}{{.Module.Path}}{{end}}' ./... | sort -u | grep -v '^$' | wc -l | tr -d ' ')
-          echo "non-stdlib modules in the build: $count (budget $budget)"
-          go list -deps -f '{{if and .Module (not .Standard)}}{{.Module.Path}}{{end}}' ./... | sort -u | grep -v '^$' || true
-          if [ "$count" -gt "$budget" ]; then
-            echo "::error::dependency budget exceeded: $count > $budget"
+          approved=$(sort -u <<'EOF'
+          github.com/MonalFinbox/redash-mcp
+          github.com/google/jsonschema-go
+          github.com/modelcontextprotocol/go-sdk
+          github.com/segmentio/asm
+          github.com/segmentio/encoding
+          github.com/yosida95/uritemplate/v3
+          golang.org/x/oauth2
+          golang.org/x/sync
+          golang.org/x/sys
+          golang.org/x/time
+          EOF
+          )
+          approved=$(echo "$approved" | tr -d ' ')
+          actual=$(go list -deps -f '{{if and .Module (not .Standard)}}{{.Module.Path}}{{end}}' ./... | grep -v '^$' | sort -u)
+          echo "modules in the build:"
+          echo "$actual"
+          unapproved=$(comm -23 <(echo "$actual") <(echo "$approved"))
+          if [ -n "$unapproved" ]; then
+            echo "::error::modules not on the approved list: $(echo $unapproved)"
             exit 1
           fi
 
