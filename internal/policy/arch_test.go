@@ -56,7 +56,7 @@ func TestOnlyPolicyPackageReachesTheNetwork(t *testing.T) {
 		for _, imp := range f.Imports {
 			p := strings.Trim(imp.Path.Value, `"`)
 			if netPackages[p] {
-				t.Errorf("%s imports %q — only %s may reach the network; "+
+				t.Errorf("%s imports %q, but only %s may reach the network; "+
 					"route this through policy.Guard instead", rel, p, policyDir)
 			}
 		}
@@ -68,7 +68,7 @@ func TestOnlyPolicyPackageReachesTheNetwork(t *testing.T) {
 }
 
 // TestEveryEndpointIsRegistered guards against declaring an Endpoint var and
-// forgetting to add it to all, which would make it silently unreachable —
+// forgetting to add it to all, which would make it silently unreachable,
 // or worse, reachable but invisible to the audit tooling.
 func TestEveryEndpointIsRegistered(t *testing.T) {
 	declared := []Endpoint{

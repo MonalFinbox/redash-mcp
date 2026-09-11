@@ -54,7 +54,7 @@ func ValidateBaseURL(raw string, allowPrivate bool) (*url.URL, []string, error) 
 	ips, err := net.LookupIP(host)
 	if err != nil {
 		warns = append(warns, fmt.Sprintf(
-			"%s does not resolve right now — expected if this Redash is only reachable over VPN or the office network",
+			"%s does not resolve right now, which is expected if this Redash is only reachable over VPN or the office network",
 			host))
 		return u, warns, nil
 	}

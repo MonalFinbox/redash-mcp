@@ -200,7 +200,7 @@ func networkError(t Target, err error) error {
 	var opErr *net.OpError
 	if errors.As(err, &dnsErr) || errors.As(err, &opErr) || errors.Is(err, context.DeadlineExceeded) {
 		return fmt.Errorf(
-			"cannot reach Redash instance %q at %s — if this Redash is only reachable from the office network, check that your VPN is connected (underlying error: %v)",
+			"cannot reach Redash instance %q at %s. If this Redash is only reachable from the office network, check that your VPN is connected (underlying error: %v)",
 			t.Name, t.BaseURL(), err)
 	}
 	return fmt.Errorf("request to Redash instance %q failed: %w", t.Name, err)
@@ -209,7 +209,7 @@ func networkError(t Target, err error) error {
 func statusError(t Target, ep Endpoint, code int, body []byte) error {
 	switch code {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return fmt.Errorf("Redash instance %q refused %s with %d — the API key may be wrong, or the service account may not have access to this object",
+		return fmt.Errorf("Redash instance %q refused %s with %d: the API key may be wrong, or the service account may not have access to this object",
 			t.Name, ep.name, code)
 	case http.StatusNotFound:
 		return fmt.Errorf("Redash instance %q has no such object for %s (404)", t.Name, ep.name)

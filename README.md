@@ -1,7 +1,7 @@
 # redash-mcp
 
 A Model Context Protocol server that gives an AI assistant **read access** to
-[Redash](https://redash.io) — and is structurally incapable of writing to it.
+[Redash](https://redash.io), and is structurally incapable of writing to it.
 
 Every other Redash MCP server I could find exposes `create_query`,
 `update_query`, `archive_query` and arbitrary ad-hoc SQL, with no read-only
@@ -11,14 +11,14 @@ or a dumped table. This one is built the other way round: the safety property
 comes first, and it is small enough to audit in an afternoon.
 
 > **Status: early.** The policy core, configuration and validation are done and
-> tested. The MCP server itself is not wired up yet — see [Milestones](#milestones).
+> tested. The MCP server itself is not wired up yet (see [Milestones](#milestones)).
 > `redash-mcp --check` already works and is useful on its own.
 
 ## How the read-only guarantee works
 
 Two independent layers, either of which alone would stop a write:
 
-**1. The Redash account.** Redash has no read-only API key — a User API Key
+**1. The Redash account.** Redash has no read-only API key: a User API Key
 carries every permission its owner has. What *can* be scoped is the account, so
 this server is meant to run as a dedicated Redash user in a group with
 **View Only** access to its data sources. Redash then refuses writes server-side
@@ -29,7 +29,7 @@ no matter what any client sends. Setting this up is
 hold an HTTP client. They name an endpoint from a closed table in
 [`internal/policy/endpoints.go`](internal/policy/endpoints.go), and
 `policy.Guard` is the only code in the program that issues a request. It
-exposes exactly one method — `Get`. There is no `Do`, no `Post`, no `Delete`.
+exposes exactly one method: `Get`. There is no `Do`, no `Post`, no `Delete`.
 
 Three tests keep that honest, and all three fail loudly if it stops being true:
 
@@ -46,7 +46,7 @@ These are design constraints, not a roadmap. A PR adding one should be closed.
 - Ad-hoc SQL of any kind
 - Creating, editing, archiving or deleting queries, dashboards, visualizations or alerts
 - Any access to `/api/users`, `/api/groups`, `/api/destinations`, or data source credentials
-- Any HTTP transport listening on a port — stdio only
+- Any HTTP transport listening on a port (stdio only)
 - Telemetry, analytics, or any outbound connection to a host other than your configured Redash
 
 ## Setup
@@ -58,7 +58,7 @@ In Redash, as an admin:
 1. Create a new user, e.g. `mcp-readonly@yourcompany.com`.
 2. Create a group, e.g. `mcp-readonly`, and add that user to it.
 3. Give the group **View Only** access to each data source it should reach.
-   Not Full Access — View Only is what blocks creating and running queries.
+   Not Full Access: View Only is what blocks creating and running queries.
 4. Sign in as that user and copy its API key from the profile page.
 
 This also blocks Redash's text-type query parameters, which are its SQL
@@ -98,7 +98,7 @@ redash-mcp --check
 ```
 
 This prints the tier, the limits, each instance and how many layers protect it,
-every endpoint and whether it is reachable, and any warnings — without making a
+every endpoint and whether it is reachable, and any warnings, without making a
 single request to Redash.
 
 ### All settings
@@ -107,8 +107,8 @@ single request to Redash.
 | --- | --- | --- |
 | `REDASH_INSTANCES` | *required* | Comma-separated instance names, e.g. `prod,uat` |
 | `REDASH_<NAME>_URL` | *required* | Base URL. Must be `https`. |
-| `REDASH_<NAME>_API_KEY_FILE` | — | Path to a `chmod 600` file holding the key. Preferred. |
-| `REDASH_<NAME>_API_KEY` | — | The key inline. Used only if no key file is set. |
+| `REDASH_<NAME>_API_KEY_FILE` | none | Path to a `chmod 600` file holding the key. Preferred. |
+| `REDASH_<NAME>_API_KEY` | none | The key inline. Used only if no key file is set. |
 | `REDASH_<NAME>_ENFORCED_READONLY` | `false` | Declares the Redash account is View Only |
 | `REDASH_<NAME>_DATA_SOURCES` | all | Restrict to these data source ids |
 | `REDASH_TIER` | `read` | `read` (GET only) or `execute` |
@@ -123,8 +123,8 @@ single request to Redash.
 
 ### Redash behind a VPN
 
-If your Redash resolves to a private address — normal for self-hosted or
-VPN-only deployments — startup refuses it by default, because that is also
+If your Redash resolves to a private address (normal for self-hosted or
+VPN-only deployments), startup refuses it by default, because that is also
 what an SSRF attempt looks like. Opt in:
 
 ```bash
@@ -138,7 +138,7 @@ get a message naming the VPN when a call actually fails.
 ### Redaction
 
 The default pattern masks common PII column names, anchored on word boundaries
-so it does not eat ordinary columns — a naive substring match for `pan` would
+so it does not eat ordinary columns: a naive substring match for `pan` would
 also redact `company`:
 
 ```
@@ -161,12 +161,12 @@ and no `POST` code path exists.
 
 ## Milestones
 
-- [x] **M0** — repo, CI, vulnerability scanning, secret scanning, dependency budget
-- [x] **M1** — policy table, tier gate, guard, config validation, `--check`
-- [ ] **M2** — the MCP server and the seven read tools
-- [ ] **M3** — docs, signed release binaries, Homebrew tap
-- [ ] **M4** — execute tier behind its flag
-- [ ] **M5** — audit log, fuzzing, MCP registry
+- [x] **M0**: repo, CI, vulnerability scanning, secret scanning, dependency budget
+- [x] **M1**: policy table, tier gate, guard, config validation, `--check`
+- [ ] **M2**: the MCP server and the seven read tools
+- [ ] **M3**: docs, signed release binaries, Homebrew tap
+- [ ] **M4**: execute tier behind its flag
+- [ ] **M5**: audit log, fuzzing, MCP registry
 
 ## Contributing
 

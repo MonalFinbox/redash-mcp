@@ -77,9 +77,9 @@ func writeBanner(w io.Writer, cfg *config.Config) {
 		state := "reachable"
 		switch {
 		case ep.Tier() > cfg.Tier:
-			state = "blocked — needs tier " + ep.Tier().String()
+			state = "blocked, needs tier " + ep.Tier().String()
 		case ep.Method() != "GET":
-			state = "blocked — no non-GET code path exists"
+			state = "blocked, no non-GET code path exists"
 		}
 		fmt.Fprintf(w, "  %-4s %-32s %s\n", ep.Method(), ep.Path(), state)
 	}
