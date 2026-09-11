@@ -281,3 +281,13 @@ func TestParseTier(t *testing.T) {
 		t.Error("ParseTier(\"admin\") should fail closed")
 	}
 }
+
+func TestNotFoundIsASentinel(t *testing.T) {
+	rt := &recordingTransport{t: t, code: http.StatusNotFound, body: `{"message":"No cached result found for this query."}`}
+	g := NewGuard(Options{Tier: TierRead, Transport: rt})
+	tgt, _ := testTarget(t)
+
+	if _, err := g.Get(context.Background(), tgt, GetQueryResults, Binding{ID: 7}, nil); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}

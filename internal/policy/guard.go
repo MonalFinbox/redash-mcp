@@ -215,13 +215,17 @@ func networkError(t Target, err error) error {
 	return fmt.Errorf("request to Redash instance %q failed: %w", t.Name, err)
 }
 
+// ErrNotFound marks a 404, so a caller can explain what it means for its own
+// endpoint: for a stored result, usually that the query has never been run.
+var ErrNotFound = errors.New("not found")
+
 func statusError(t Target, ep Endpoint, code int, body []byte) error {
 	switch code {
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return fmt.Errorf("Redash instance %q refused %s with %d: the API key may be wrong, or the service account may not have access to this object",
 			t.Name, ep.name, code)
 	case http.StatusNotFound:
-		return fmt.Errorf("Redash instance %q has no such object for %s (404)", t.Name, ep.name)
+		return fmt.Errorf("%w: Redash instance %q has no such object for %s (404)", ErrNotFound, t.Name, ep.name)
 	case http.StatusTooManyRequests:
 		return fmt.Errorf("Redash instance %q is rate limiting this client (429)", t.Name)
 	}
