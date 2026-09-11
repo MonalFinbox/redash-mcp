@@ -297,3 +297,37 @@ func TestTargetsCarryEnforcementFlag(t *testing.T) {
 		t.Errorf("BaseURL = %q", tgt.BaseURL())
 	}
 }
+
+func TestDefaultInstance(t *testing.T) {
+	e := baseEnv(t)
+	c, err := Load(envMap(e))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.DefaultInstance != "prod" {
+		t.Errorf("a lone instance should be the default, got %q", c.DefaultInstance)
+	}
+
+	e["REDASH_INSTANCES"] = "prod,uat"
+	e["REDASH_UAT_URL"] = "https://redash-uat.invalid"
+	e["REDASH_UAT_API_KEY_FILE"] = keyFile(t, 0o600)
+	if c, err = Load(envMap(e)); err != nil {
+		t.Fatal(err)
+	}
+	if c.DefaultInstance != "" {
+		t.Errorf("several instances and no choice must mean no default, got %q", c.DefaultInstance)
+	}
+
+	e["REDASH_DEFAULT_INSTANCE"] = "uat"
+	if c, err = Load(envMap(e)); err != nil {
+		t.Fatal(err)
+	}
+	if c.DefaultInstance != "uat" {
+		t.Errorf("DefaultInstance = %q, want uat", c.DefaultInstance)
+	}
+
+	e["REDASH_DEFAULT_INSTANCE"] = "staging"
+	if _, err := Load(envMap(e)); err == nil {
+		t.Fatal("a default that is not a configured instance must be refused")
+	}
+}

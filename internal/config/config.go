@@ -51,8 +51,13 @@ type Instance struct {
 }
 
 type Config struct {
-	Order        []string
-	Instances    map[string]*Instance
+	Order     []string
+	Instances map[string]*Instance
+
+	// DefaultInstance is the instance a tool call uses when it names none.
+	// Empty means every call has to name one.
+	DefaultInstance string
+
 	Tier         policy.Tier
 	MaxRows      int
 	MaxBytes     int
@@ -149,6 +154,10 @@ func Load(env Env) (*Config, error) {
 		c.Order = append(c.Order, name)
 	}
 
+	if c.DefaultInstance, err = defaultInstance(env, c.Order); err != nil {
+		return nil, err
+	}
+
 	for _, inst := range c.Instances {
 		if !inst.EnforcedReadOnly {
 			c.Warnings = append(c.Warnings, fmt.Sprintf(
@@ -187,6 +196,26 @@ func loadInstance(env Env, name string, allowPrivate bool) (*Instance, []string,
 		inst.DataSources = append(inst.DataSources, id)
 	}
 	return inst, warns, nil
+}
+
+// defaultInstance picks the instance a tool call uses when it names none. A
+// lone instance is unambiguous; with several, the choice must be explicit,
+// and no choice means every call has to name one.
+func defaultInstance(env Env, names []string) (string, error) {
+	d := strings.TrimSpace(env("REDASH_DEFAULT_INSTANCE"))
+	if d == "" {
+		if len(names) == 1 {
+			return names[0], nil
+		}
+		return "", nil
+	}
+	for _, n := range names {
+		if n == d {
+			return d, nil
+		}
+	}
+	return "", fmt.Errorf("REDASH_DEFAULT_INSTANCE is %q, which is not listed in REDASH_INSTANCES (%s)",
+		d, strings.Join(names, ","))
 }
 
 // loadKey prefers a key file over an inline env var, and refuses a key file

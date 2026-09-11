@@ -22,6 +22,7 @@ var Version = "dev"
 
 func main() {
 	check := flag.Bool("check", false, "validate the configuration, print what this server could do, and exit")
+	envFile := flag.String("env-file", "", "read REDASH_ settings from this chmod 600 file; the process environment still wins")
 	version := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -30,7 +31,17 @@ func main() {
 		return
 	}
 
-	cfg, err := config.Load(os.Getenv)
+	env := config.Env(os.Getenv)
+	if *envFile != "" {
+		fileEnv, err := config.LoadEnvFile(*envFile, env)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "redash-mcp: configuration error\n\n%v\n", err)
+			os.Exit(1)
+		}
+		env = fileEnv
+	}
+
+	cfg, err := config.Load(env)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "redash-mcp: configuration error\n\n%v\n", err)
 		os.Exit(1)
@@ -55,6 +66,11 @@ func writeBanner(w io.Writer, cfg *config.Config) {
 		cfg.MaxRows, humanBytes(cfg.MaxBytes), cfg.MaxCellChars, cfg.RateLimit, cfg.Timeout)
 	fmt.Fprintf(w, "redaction     %s\n", cfg.Redact.String())
 	fmt.Fprintf(w, "audit log     %s\n", cfg.AuditLog)
+	if cfg.DefaultInstance != "" {
+		fmt.Fprintf(w, "default       %s (used when a tool call names no instance)\n", cfg.DefaultInstance)
+	} else {
+		fmt.Fprintln(w, "default       none (every tool call must name an instance)")
+	}
 
 	fmt.Fprintln(w, "\ninstances")
 	for _, name := range cfg.Order {
