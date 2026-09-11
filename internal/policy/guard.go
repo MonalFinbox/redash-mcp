@@ -30,6 +30,7 @@ var (
 	ErrTierDenied   = errors.New("endpoint requires a higher capability tier than this server was started with")
 	ErrNotGet       = errors.New("Get called with a non-GET endpoint")
 	ErrRedirect     = errors.New("Redash returned a redirect, which is not followed")
+	ErrTooLarge     = errors.New("Redash response exceeded the size cap")
 )
 
 // Target is a resolved Redash instance. Tools never build one: they name an
@@ -183,12 +184,20 @@ func (g *Guard) Get(ctx context.Context, t Target, ep Endpoint, b Binding, q url
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, g.maxBytes))
+	// One byte past the cap is read so an oversized body can be told apart
+	// from one that is exactly at it.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, g.maxBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("reading response from instance %q: %w", t.Name, err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, statusError(t, ep, resp.StatusCode, body)
+	}
+	// A JSON document cut at the cap is not a smaller answer but a corrupt
+	// one, so an oversized body is refused rather than truncated.
+	if int64(len(body)) > g.maxBytes {
+		return nil, fmt.Errorf("%w: %s on instance %q returned more than %d bytes; narrow the request",
+			ErrTooLarge, ep.name, t.Name, g.maxBytes)
 	}
 	return body, nil
 }
