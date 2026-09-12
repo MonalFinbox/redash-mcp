@@ -235,18 +235,25 @@ func TestRedirectsAreNotFollowed(t *testing.T) {
 	}
 }
 
-func TestResponseBodyIsCapped(t *testing.T) {
-	huge := strings.Repeat("x", 4096)
-	rt := &recordingTransport{t: t, body: huge}
+// TestOversizedResponseIsRefused checks the cap refuses rather than cuts. A
+// JSON document truncated at the cap is not a smaller answer but a corrupt
+// one, and it used to surface as a baffling decode error.
+func TestOversizedResponseIsRefused(t *testing.T) {
+	rt := &recordingTransport{t: t, body: strings.Repeat("x", 4096)}
 	g := NewGuard(Options{Tier: TierRead, Transport: rt, MaxBodyBytes: 512})
 	tgt, _ := testTarget(t)
 
+	if _, err := g.Get(context.Background(), tgt, ListQueries, Binding{}, nil); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("want ErrTooLarge for a body over the cap, got %v", err)
+	}
+
+	rt.body = strings.Repeat("x", 512)
 	body, err := g.Get(context.Background(), tgt, ListQueries, Binding{}, nil)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("a body exactly at the cap should pass: %v", err)
 	}
 	if len(body) != 512 {
-		t.Fatalf("body cap not applied: got %d bytes, want 512", len(body))
+		t.Fatalf("got %d bytes, want 512", len(body))
 	}
 }
 
@@ -272,5 +279,15 @@ func TestParseTier(t *testing.T) {
 	}
 	if _, err := ParseTier("admin"); err == nil {
 		t.Error("ParseTier(\"admin\") should fail closed")
+	}
+}
+
+func TestNotFoundIsASentinel(t *testing.T) {
+	rt := &recordingTransport{t: t, code: http.StatusNotFound, body: `{"message":"No cached result found for this query."}`}
+	g := NewGuard(Options{Tier: TierRead, Transport: rt})
+	tgt, _ := testTarget(t)
+
+	if _, err := g.Get(context.Background(), tgt, GetQueryResults, Binding{ID: 7}, nil); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("want ErrNotFound, got %v", err)
 	}
 }

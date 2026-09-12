@@ -30,6 +30,7 @@ var (
 	ErrTierDenied   = errors.New("endpoint requires a higher capability tier than this server was started with")
 	ErrNotGet       = errors.New("Get called with a non-GET endpoint")
 	ErrRedirect     = errors.New("Redash returned a redirect, which is not followed")
+	ErrTooLarge     = errors.New("Redash response exceeded the size cap")
 )
 
 // Target is a resolved Redash instance. Tools never build one: they name an
@@ -183,12 +184,20 @@ func (g *Guard) Get(ctx context.Context, t Target, ep Endpoint, b Binding, q url
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, g.maxBytes))
+	// One byte past the cap is read so an oversized body can be told apart
+	// from one that is exactly at it.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, g.maxBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("reading response from instance %q: %w", t.Name, err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, statusError(t, ep, resp.StatusCode, body)
+	}
+	// A JSON document cut at the cap is not a smaller answer but a corrupt
+	// one, so an oversized body is refused rather than truncated.
+	if int64(len(body)) > g.maxBytes {
+		return nil, fmt.Errorf("%w: %s on instance %q returned more than %d bytes; narrow the request",
+			ErrTooLarge, ep.name, t.Name, g.maxBytes)
 	}
 	return body, nil
 }
@@ -200,19 +209,23 @@ func networkError(t Target, err error) error {
 	var opErr *net.OpError
 	if errors.As(err, &dnsErr) || errors.As(err, &opErr) || errors.Is(err, context.DeadlineExceeded) {
 		return fmt.Errorf(
-			"cannot reach Redash instance %q at %s — if this Redash is only reachable from the office network, check that your VPN is connected (underlying error: %v)",
+			"cannot reach Redash instance %q at %s. If this Redash is only reachable from the office network, check that your VPN is connected (underlying error: %v)",
 			t.Name, t.BaseURL(), err)
 	}
 	return fmt.Errorf("request to Redash instance %q failed: %w", t.Name, err)
 }
 
+// ErrNotFound marks a 404, so a caller can explain what it means for its own
+// endpoint: for a stored result, usually that the query has never been run.
+var ErrNotFound = errors.New("not found")
+
 func statusError(t Target, ep Endpoint, code int, body []byte) error {
 	switch code {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return fmt.Errorf("Redash instance %q refused %s with %d — the API key may be wrong, or the service account may not have access to this object",
+		return fmt.Errorf("Redash instance %q refused %s with %d: the API key may be wrong, or the service account may not have access to this object",
 			t.Name, ep.name, code)
 	case http.StatusNotFound:
-		return fmt.Errorf("Redash instance %q has no such object for %s (404)", t.Name, ep.name)
+		return fmt.Errorf("%w: Redash instance %q has no such object for %s (404)", ErrNotFound, t.Name, ep.name)
 	case http.StatusTooManyRequests:
 		return fmt.Errorf("Redash instance %q is rate limiting this client (429)", t.Name)
 	}
